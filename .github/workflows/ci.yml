@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -21,3 +22,30 @@ jobs:
         run: dotnet test FoxgloveRosSharp.sln --configuration Release --no-build --verbosity normal
       - name: Pack
         run: dotnet pack src/FoxgloveRosSharp/FoxgloveRosSharp.csproj --configuration Release --no-build --output artifacts
+
+  publish:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore FoxgloveRosSharp.sln
+      - name: Build
+        run: dotnet build FoxgloveRosSharp.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test FoxgloveRosSharp.sln --configuration Release --no-build --verbosity normal
+      - name: Pack
+        run: dotnet pack src/FoxgloveRosSharp/FoxgloveRosSharp.csproj --configuration Release --no-build --output artifacts
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: noahwardlow
+      - name: Publish
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
