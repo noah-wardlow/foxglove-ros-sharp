@@ -39,16 +39,31 @@ the bridge-advertised CDR schemas.
 
 ## Install
 
-Reference the project directly:
+### From Source
+
+```bash
+git clone https://github.com/noah-wardlow/foxglove-ros-sharp.git
+dotnet add reference foxglove-ros-sharp/src/FoxgloveRosSharp/FoxgloveRosSharp.csproj
+```
+
+### From a Local NuGet Package
+
+Build a `.nupkg`:
+
+```bash
+dotnet pack src/FoxgloveRosSharp/FoxgloveRosSharp.csproj --configuration Release --output artifacts
+```
+
+Then install it into another .NET project from that local folder:
+
+```bash
+dotnet add package FoxgloveRosSharp --source /absolute/path/to/foxglove-ros-sharp/artifacts
+```
+
+### From NuGet
 
 ```bash
 dotnet add package FoxgloveRosSharp
-```
-
-Or from source:
-
-```bash
-dotnet add reference path/to/foxglove-ros-sharp/src/FoxgloveRosSharp/FoxgloveRosSharp.csproj
 ```
 
 ## Connect
@@ -210,8 +225,9 @@ Existing ROS# generated message classes can be reused when they expose
 `public const string RosMessageName`.
 
 Topic and service responses are decoded from Foxglove CDR payloads using the
-schemas advertised by the bridge. Publishing uses CDR when a matching schema has
-been advertised and falls back to JSON otherwise.
+schemas advertised by the bridge. Publishing uses Foxglove client channels: it
+sends CDR when a matching schema has been advertised, otherwise it sends a
+JSON-encoded message payload.
 
 The CDR codec handles ROS 2 encapsulation-header-relative alignment, including
 8-byte aligned fields such as `float64[]` in `sensor_msgs/msg/JointState`.
