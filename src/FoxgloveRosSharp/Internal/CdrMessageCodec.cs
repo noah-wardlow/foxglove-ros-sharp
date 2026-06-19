@@ -185,6 +185,7 @@ namespace RosSharp.RosBridgeClient.Internal
     internal sealed class CdrWriter
     {
         private readonly MemoryStream stream = new();
+        private int alignmentOrigin;
 
         public void WriteEncapsulationHeader()
         {
@@ -192,6 +193,7 @@ namespace RosSharp.RosBridgeClient.Internal
             stream.WriteByte(1);
             stream.WriteByte(0);
             stream.WriteByte(0);
+            alignmentOrigin = checked((int)stream.Position);
         }
 
         public byte[] ToArray() => stream.ToArray();
@@ -226,7 +228,7 @@ namespace RosSharp.RosBridgeClient.Internal
 
         private void Align(int alignment)
         {
-            long padding = Padding(stream.Position, alignment);
+            long padding = Padding(stream.Position - alignmentOrigin, alignment);
             for (int i = 0; i < padding; i++)
                 stream.WriteByte(0);
         }
@@ -248,12 +250,14 @@ namespace RosSharp.RosBridgeClient.Internal
     internal sealed class CdrReader
     {
         private readonly byte[] data;
+        private readonly int alignmentOrigin;
         private int offset;
 
         public CdrReader(byte[] data)
         {
             this.data = data;
             offset = data.Length >= 4 && data[0] == 0 && (data[1] == 0 || data[1] == 1) ? 4 : 0;
+            alignmentOrigin = offset;
         }
 
         public byte ReadUInt8() => data[offset++];
@@ -296,7 +300,7 @@ namespace RosSharp.RosBridgeClient.Internal
 
         private void Align(int alignment)
         {
-            int padding = Padding(offset, alignment);
+            int padding = Padding(offset - alignmentOrigin, alignment);
             offset += padding;
         }
 

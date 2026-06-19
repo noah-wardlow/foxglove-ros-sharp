@@ -54,12 +54,60 @@ uint32 nanosec
             Assert.Equal(new[] { 1.5, 2.5 }, decoded.position);
         }
 
+        [Fact]
+        public void DeserializesRos2CdrWithEightByteAlignmentAfterEncapsulationHeader()
+        {
+            const string schema = """
+std_msgs/Header header
+string[] name
+float64[] position
+float64[] velocity
+float64[] effort
+================================================================================
+MSG: std_msgs/Header
+builtin_interfaces/Time stamp
+string frame_id
+================================================================================
+MSG: builtin_interfaces/Time
+int32 sec
+uint32 nanosec
+""";
+            byte[] data =
+            {
+                0x00, 0x01, 0x00, 0x00,
+                0x01, 0x00, 0x00, 0x00,
+                0x02, 0x00, 0x00, 0x00,
+                0x02, 0x00, 0x00, 0x00,
+                0x61, 0x00,
+                0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x01, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0xf4, 0x3f,
+                0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00
+            };
+            var codec = new CdrMessageCodec("sensor_msgs/msg/JointState", schema);
+
+            JointState decoded = codec.Deserialize<JointState>(data);
+
+            Assert.Equal(1, decoded.header.stamp.sec);
+            Assert.Equal(2u, decoded.header.stamp.nanosec);
+            Assert.Equal("a", decoded.header.frame_id);
+            Assert.Empty(decoded.name);
+            Assert.Equal(new[] { 1.25 }, decoded.position);
+            Assert.Empty(decoded.velocity);
+            Assert.Empty(decoded.effort);
+        }
+
         public sealed class JointState : Message
         {
             public const string RosMessageName = "sensor_msgs/msg/JointState";
             public Header header { get; set; } = new();
             public string[] name { get; set; } = System.Array.Empty<string>();
             public double[] position { get; set; } = System.Array.Empty<double>();
+            public double[] velocity { get; set; } = System.Array.Empty<double>();
+            public double[] effort { get; set; } = System.Array.Empty<double>();
         }
 
         public sealed class Header : Message

@@ -19,6 +19,24 @@ This project is early and intentionally focused on runtime communication:
 It does not include Unity components, URDF tooling, editor extensions, or ROS
 message generation.
 
+## ROS# Drop-In Surface
+
+The runtime API intentionally uses the ROS# namespace and method names used by
+existing `RosSharp.RosBridgeClient` code:
+
+- `new RosSocket(...)`
+- `Advertise<T>()`, `Publish()`, `Unadvertise()`
+- `Subscribe<T>()`, `Unsubscribe()`
+- `CallService<TRequest, TResponse>()`
+- `SendActionGoalRequest<...>()`, `CancelActionGoalRequest<...>()`
+- `Close(int millisecondsWait = 0)` and `Dispose()`
+
+Generated ROS# message classes can be reused when they expose
+`public const string RosMessageName` and public fields or properties matching
+the ROS message field names. This package swaps the transport under that API:
+it talks to `foxglove_bridge` over the Foxglove WebSocket protocol and decodes
+the bridge-advertised CDR schemas.
+
 ## Install
 
 Reference the project directly:
@@ -157,6 +175,10 @@ forwards to the action on the ROS side. This library does not hard-code any such
 service; use `CallService<TRequest, TResponse>()` with your own generated
 service message classes.
 
+Foxglove may advertise ROS 2 action service schemas with the goal/result fields
+flattened at the request or response root. The client handles both flattened
+Foxglove action schemas and nested ROS# action wrapper classes.
+
 ## Examples
 
 The `examples/TopicServiceActionDemo` project demonstrates neutral topic,
@@ -191,9 +213,21 @@ Topic and service responses are decoded from Foxglove CDR payloads using the
 schemas advertised by the bridge. Publishing uses CDR when a matching schema has
 been advertised and falls back to JSON otherwise.
 
+The CDR codec handles ROS 2 encapsulation-header-relative alignment, including
+8-byte aligned fields such as `float64[]` in `sensor_msgs/msg/JointState`.
+
 `foxglove_bridge` does not support client-side service advertisement through
 the WebSocket protocol, so `AdvertiseService()` and `UnadvertiseService()` throw
 `NotSupportedException`.
+
+## Live Verification
+
+The client has been live-tested against a Foxglove bridge with
+`include_hidden:=true` for:
+
+- subscribing to `/joint_states` as `sensor_msgs/msg/JointState`
+- sending `/do_objective` as a ROS 2 action
+- receiving a successful action result
 
 ## License
 
