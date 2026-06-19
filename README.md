@@ -39,14 +39,24 @@ the bridge-advertised CDR schemas.
 
 ## Install
 
+### From NuGet
+
+```bash
+dotnet add package FoxgloveRosSharp
+```
+
 ### From Source
+
+Use this when testing local changes before publishing a package:
 
 ```bash
 git clone https://github.com/noah-wardlow/foxglove-ros-sharp.git
 dotnet add reference foxglove-ros-sharp/src/FoxgloveRosSharp/FoxgloveRosSharp.csproj
 ```
 
-### From a Local NuGet Package
+### From a Local Package
+
+Use this when testing the packaged output before publishing it:
 
 Build a `.nupkg`:
 
@@ -58,12 +68,6 @@ Then install it into another .NET project from that local folder:
 
 ```bash
 dotnet add package FoxgloveRosSharp --source /absolute/path/to/foxglove-ros-sharp/artifacts
-```
-
-### From NuGet
-
-```bash
-dotnet add package FoxgloveRosSharp
 ```
 
 ## Connect
