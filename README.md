@@ -14,7 +14,7 @@ This project is early and intentionally focused on runtime communication:
 - topic subscription and publishing
 - service calls
 - parameter get/set
-- ROS 2 action clients when the bridge advertises standard action endpoints
+- ROS 2 action clients when the bridge advertises hidden action endpoints
 
 It does not include Unity components, URDF tooling, editor extensions, or ROS
 message generation.
@@ -90,8 +90,9 @@ public sealed class TriggerResponse : Message
 
 ## Actions
 
-When Foxglove advertises the standard ROS 2 action services and feedback topic,
-`RosSocket` maps ROS# action calls to:
+ROS 2 action clients are available only when the Foxglove bridge advertises the
+hidden ROS 2 action services and feedback topic. `RosSocket` maps ROS# action
+calls to:
 
 - `<action>/_action/send_goal`
 - `<action>/_action/get_result`
@@ -114,6 +115,12 @@ await ros.WaitForServiceAsync(
     "/example_action/_action/send_goal",
     TimeSpan.FromSeconds(5));
 
+// Or wait for the endpoints needed to send a goal and receive the result:
+await ros.WaitForActionAsync(
+    "/example_action",
+    TimeSpan.FromSeconds(5),
+    requireFeedback: true);
+
 string goalId = ros.SendActionGoalRequest<
     ExampleTaskActionGoal,
     ExampleTaskGoal,
@@ -124,11 +131,31 @@ string goalId = ros.SendActionGoalRequest<
         feedback => Console.WriteLine(feedback.values));
 ```
 
-Some Foxglove bridge deployments do not expose hidden ROS 2 action endpoints.
-In that case, call an application-level service that forwards to the action on
-the ROS side. This library does not hard-code any such service; use
-`CallService<TRequest, TResponse>()` with your own generated service message
-classes.
+Foxglove Bridge sets `include_hidden` to `false` by default. Since ROS 2 action
+endpoints are hidden services/topics, default bridge launches usually do not
+advertise actions. Launch the bridge with hidden entities enabled if you want
+direct action support:
+
+```bash
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml include_hidden:=true
+```
+
+You can check action availability before sending a goal:
+
+```csharp
+if (!ros.IsActionAdvertised("/example_action", requireFeedback: true))
+{
+    string[] missing = ros.GetMissingActionEndpoints("/example_action", requireFeedback: true);
+    Console.WriteLine(string.Join(", ", missing));
+}
+```
+
+If direct action endpoints are not available, `SendActionGoalRequest()` and
+`CancelActionGoalRequest()` throw `ActionNotAdvertisedException` with the
+missing endpoint list. In that case, call an application-level service that
+forwards to the action on the ROS side. This library does not hard-code any such
+service; use `CallService<TRequest, TResponse>()` with your own generated
+service message classes.
 
 ## Examples
 

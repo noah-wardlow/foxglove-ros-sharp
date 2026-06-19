@@ -7,3 +7,4 @@
 - Added service client support.
 - Added parameter get/set support.
 - Added ROS 2 action client support for bridges that advertise standard action endpoints.
+- Added explicit action endpoint discovery and helpful failures for default Foxglove bridges that hide action internals.

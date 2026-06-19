@@ -35,8 +35,7 @@ else
     Console.WriteLine($"Service {serviceName} was not advertised; skipping service call.");
 }
 
-string sendGoalService = $"{actionName.TrimEnd('/')}/_action/send_goal";
-if (await ros.WaitForServiceAsync(sendGoalService, TimeSpan.FromSeconds(2)))
+if (await ros.WaitForActionAsync(actionName, TimeSpan.FromSeconds(2), requireFeedback: true))
 {
     var resultTask = new TaskCompletionSource<ExampleTaskActionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
     var feedbackTask = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -61,7 +60,9 @@ if (await ros.WaitForServiceAsync(sendGoalService, TimeSpan.FromSeconds(2)))
 }
 else
 {
-    Console.WriteLine($"Action service {sendGoalService} was not advertised; skipping action goal.");
+    string[] missing = ros.GetMissingActionEndpoints(actionName, requireFeedback: true);
+    Console.WriteLine($"Action {actionName} was not advertised; skipping action goal.");
+    Console.WriteLine($"Missing endpoint(s): {string.Join(", ", missing)}");
 }
 
 public sealed class TriggerRequest : Message

@@ -229,6 +229,8 @@ namespace RosSharp.RosBridgeClient
             actionGoal.action_type = actionType;
             SetGoalInfo(actionGoal.goalInfo, id);
 
+            EnsureActionAdvertised(actionName, actionGoal.feedback);
+
             if (actionGoal.feedback && actionFeedbackResponseHandler != null)
             {
                 string feedbackTopic = ActionEndpoint(actionName, "feedback");
@@ -295,6 +297,8 @@ namespace RosSharp.RosBridgeClient
         {
             string actionName = RequireActionName(action);
             string id = string.IsNullOrWhiteSpace(frameId) ? NewGoalId(zero: true) : frameId;
+
+            EnsureActionCancelAdvertised(actionName);
 
             var request = new CancelGoalRequest
             {
@@ -367,6 +371,54 @@ namespace RosSharp.RosBridgeClient
             onSuccess(topics);
         }
 
+        public bool IsTopicAdvertised(string topic)
+        {
+            lock (gate)
+                return channelsByTopic.ContainsKey(topic);
+        }
+
+        public bool IsServiceAdvertised(string serviceName)
+        {
+            lock (gate)
+                return servicesByName.ContainsKey(serviceName);
+        }
+
+        public bool IsActionAdvertised(string actionName, bool requireFeedback = false, bool requireCancel = false)
+        {
+            return GetMissingActionEndpoints(RequireActionName(actionName), requireFeedback, requireCancel).Length == 0;
+        }
+
+        public string[] GetMissingActionEndpoints(string actionName, bool requireFeedback = false, bool requireCancel = false)
+        {
+            actionName = RequireActionName(actionName);
+            var missing = new List<string>();
+            lock (gate)
+            {
+                foreach (string leaf in new[] { "send_goal", "get_result" })
+                {
+                    string service = ActionEndpoint(actionName, leaf);
+                    if (!servicesByName.ContainsKey(service))
+                        missing.Add(service);
+                }
+
+                if (requireCancel)
+                {
+                    string cancel = ActionEndpoint(actionName, "cancel_goal");
+                    if (!servicesByName.ContainsKey(cancel))
+                        missing.Add(cancel);
+                }
+
+                if (requireFeedback)
+                {
+                    string feedback = ActionEndpoint(actionName, "feedback");
+                    if (!channelsByTopic.ContainsKey(feedback))
+                        missing.Add(feedback);
+                }
+            }
+
+            return missing.ToArray();
+        }
+
         public async Task<bool> WaitForServiceAsync(
             string serviceName,
             TimeSpan timeout,
@@ -401,6 +453,41 @@ namespace RosSharp.RosBridgeClient
             finally
             {
                 AdvertisedServicesChanged -= Check;
+            }
+        }
+
+        public async Task<bool> WaitForActionAsync(
+            string actionName,
+            TimeSpan timeout,
+            bool requireFeedback = false,
+            bool requireCancel = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (IsActionAdvertised(actionName, requireFeedback, requireCancel))
+                return true;
+
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var timeoutCts = new CancellationTokenSource(timeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            void Check()
+            {
+                if (IsActionAdvertised(actionName, requireFeedback, requireCancel))
+                    tcs.TrySetResult(true);
+            }
+
+            AdvertisedServicesChanged += Check;
+            ChannelsChanged += Check;
+            using CancellationTokenRegistration registration = linkedCts.Token.Register(() => tcs.TrySetResult(false));
+            try
+            {
+                Check();
+                return await tcs.Task.ConfigureAwait(false);
+            }
+            finally
+            {
+                AdvertisedServicesChanged -= Check;
+                ChannelsChanged -= Check;
             }
         }
 
@@ -707,6 +794,25 @@ namespace RosSharp.RosBridgeClient
                     },
                     ex => Error?.Invoke(ex));
             }
+        }
+
+        private void EnsureActionAdvertised(string actionName, bool requireFeedback)
+        {
+            string[] missingEndpoints = GetMissingActionEndpoints(actionName, requireFeedback);
+            if (missingEndpoints.Length > 0)
+                throw new ActionNotAdvertisedException(actionName, missingEndpoints);
+        }
+
+        private void EnsureActionCancelAdvertised(string actionName)
+        {
+            string cancelEndpoint = ActionEndpoint(actionName, "cancel_goal");
+            lock (gate)
+            {
+                if (servicesByName.ContainsKey(cancelEndpoint))
+                    return;
+            }
+
+            throw new ActionNotAdvertisedException(actionName, new[] { cancelEndpoint });
         }
 
         private void EnsureClientChannel(PublisherState publisher)

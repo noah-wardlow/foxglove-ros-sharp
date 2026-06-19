@@ -53,6 +53,39 @@ namespace FoxgloveRosSharp.Tests
             await server.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
+        [Fact]
+        public async Task SendActionGoalThrowsHelpfulErrorWhenActionEndpointsAreHidden()
+        {
+            int port = GetFreePort();
+            using var listener = new HttpListener();
+            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            listener.Start();
+
+            Task server = RunBridgeWithoutActionEndpoints(listener);
+
+            using var ros = new RosSocket($"ws://127.0.0.1:{port}/");
+            await ros.Connected.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(await ros.WaitForActionAsync("/example_action", TimeSpan.FromMilliseconds(100), requireFeedback: true));
+
+            var goal = new ExampleTaskActionGoal
+            {
+                action = "/example_action",
+                feedback = true,
+                args = new ExampleTaskGoal { task_name = "sample", parameters = "speed=1.0" }
+            };
+
+            ActionNotAdvertisedException exception = Assert.Throws<ActionNotAdvertisedException>(() =>
+                ros.SendActionGoalRequest<ExampleTaskActionGoal, ExampleTaskGoal, ExampleTaskActionFeedback, ExampleTaskActionResult>(
+                    goal,
+                    _ => { },
+                    _ => { }));
+
+            Assert.Equal("/example_action", exception.ActionName);
+            Assert.Contains("/example_action/_action/send_goal", exception.MissingEndpoints);
+            Assert.Contains("include_hidden:=true", exception.Message);
+            await server.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
         private static async Task RunActionServer(HttpListener listener)
         {
             HttpListenerContext context = await listener.GetContextAsync();
@@ -161,6 +194,27 @@ namespace FoxgloveRosSharp.Tests
                     }
                 }
             }
+        }
+
+        private static async Task RunBridgeWithoutActionEndpoints(HttpListener listener)
+        {
+            HttpListenerContext context = await listener.GetContextAsync();
+            HttpListenerWebSocketContext wsContext = await context.AcceptWebSocketAsync("foxglove.sdk.v1");
+            WebSocket socket = wsContext.WebSocket;
+
+            await SendText(socket, JsonSerializer.Serialize(new
+            {
+                op = "advertiseServices",
+                services = Array.Empty<object>()
+            }));
+            await SendText(socket, JsonSerializer.Serialize(new
+            {
+                op = "advertise",
+                channels = Array.Empty<object>()
+            }));
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
         }
 
         private const string SendGoalSchema = """
