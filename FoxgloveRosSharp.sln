@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FoxgloveRosSharp", "src\FoxgloveRosSharp\FoxgloveRosSharp.csproj", "{7D7AA6BB-21AC-48FC-B84F-2484B865F823}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FoxgloveRosSharp.Tests", "tests\FoxgloveRosSharp.Tests\FoxgloveRosSharp.Tests.csproj", "{FC8BA91D-2A59-4B82-BF55-38C55B7AA287}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TopicServiceActionDemo", "examples\TopicServiceActionDemo\TopicServiceActionDemo.csproj", "{3F10ADDF-77F0-4655-A820-C410F7533380}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7D7AA6BB-21AC-48FC-B84F-2484B865F823}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D7AA6BB-21AC-48FC-B84F-2484B865F823}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D7AA6BB-21AC-48FC-B84F-2484B865F823}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D7AA6BB-21AC-48FC-B84F-2484B865F823}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC8BA91D-2A59-4B82-BF55-38C55B7AA287}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC8BA91D-2A59-4B82-BF55-38C55B7AA287}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC8BA91D-2A59-4B82-BF55-38C55B7AA287}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC8BA91D-2A59-4B82-BF55-38C55B7AA287}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F10ADDF-77F0-4655-A820-C410F7533380}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F10ADDF-77F0-4655-A820-C410F7533380}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F10ADDF-77F0-4655-A820-C410F7533380}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F10ADDF-77F0-4655-A820-C410F7533380}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
