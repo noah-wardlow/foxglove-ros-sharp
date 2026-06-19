@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Fixed client-side topic publishing for new ROS topics by advertising generated ROS message schemas and publishing CDR payloads.
+- Verified live ROS-side receipt of `std_msgs/msg/String` published through `foxglove_bridge`.
+
 ## 0.1.1
 
 - Fixed ROS 2 CDR 8-byte alignment after the encapsulation header.

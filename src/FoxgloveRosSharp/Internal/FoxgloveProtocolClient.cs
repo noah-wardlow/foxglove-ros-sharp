@@ -124,13 +124,18 @@ namespace RosSharp.RosBridgeClient.Internal
             });
         }
 
-        public int AdvertiseClientChannel(string topic, string encoding, string schemaName)
+        public int AdvertiseClientChannel(
+            string topic,
+            string encoding,
+            string schemaName,
+            string? schema = null,
+            string? schemaEncoding = null)
         {
             int id = nextClientChannelId++;
             _ = SendJsonAsync(new
             {
                 op = "advertise",
-                channels = new[] { new { id, topic, encoding, schemaName } }
+                channels = new[] { new { id, topic, encoding, schemaName, schema, schemaEncoding } }
             });
             return id;
         }

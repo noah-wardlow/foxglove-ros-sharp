@@ -10,7 +10,7 @@
     <Title>Foxglove ROS Sharp</Title>
     <Description>ROS#-compatible C# client for Foxglove WebSocket bridges.</Description>
     <Authors>Noah Wardlow</Authors>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/noah-wardlow/foxglove-ros-sharp</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

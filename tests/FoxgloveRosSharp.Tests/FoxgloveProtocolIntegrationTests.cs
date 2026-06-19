@@ -38,6 +38,25 @@ namespace FoxgloveRosSharp.Tests
             await server.WaitAsync(TimeSpan.FromSeconds(5));
         }
 
+        [Fact]
+        public async Task PublishesClientChannelWithGeneratedCdrSchema()
+        {
+            int port = GetFreePort();
+            using var listener = new HttpListener();
+            listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+            listener.Start();
+
+            Task server = RunPublishCaptureServer(listener);
+
+            using var ros = new RosSocket($"ws://127.0.0.1:{port}/");
+            await ros.Connected.WaitAsync(TimeSpan.FromSeconds(5));
+
+            string publisherId = ros.Advertise<CdrMessageCodecTests.StringMessage>("/client_chatter");
+            ros.Publish(publisherId, new CdrMessageCodecTests.StringMessage { data = "from client" });
+
+            await server.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
         private static async Task RunSingleTopicServer(HttpListener listener)
         {
             HttpListenerContext context = await listener.GetContextAsync();
@@ -67,6 +86,38 @@ namespace FoxgloveRosSharp.Tests
             await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
         }
 
+        private static async Task RunPublishCaptureServer(HttpListener listener)
+        {
+            HttpListenerContext context = await listener.GetContextAsync();
+            HttpListenerWebSocketContext wsContext = await context.AcceptWebSocketAsync("foxglove.sdk.v1");
+            WebSocket socket = wsContext.WebSocket;
+
+            string advertise = await ReceiveText(socket);
+            using (JsonDocument doc = JsonDocument.Parse(advertise))
+            {
+                JsonElement channel = doc.RootElement.GetProperty("channels")[0];
+                Assert.Equal("advertise", doc.RootElement.GetProperty("op").GetString());
+                Assert.Equal("/client_chatter", channel.GetProperty("topic").GetString());
+                Assert.Equal("cdr", channel.GetProperty("encoding").GetString());
+                Assert.Equal("std_msgs/msg/String", channel.GetProperty("schemaName").GetString());
+                Assert.Equal("ros2msg", channel.GetProperty("schemaEncoding").GetString());
+                Assert.Equal("string data\n", channel.GetProperty("schema").GetString());
+            }
+
+            WebSocketMessage message = await Receive(socket);
+            Assert.Equal(WebSocketMessageType.Binary, message.Type);
+            Assert.Equal(0x01, message.Payload[0]);
+            int channelId = BinaryPrimitives.ReadInt32LittleEndian(message.Payload.AsSpan(1, 4));
+            Assert.Equal(1, channelId);
+            byte[] data = message.Payload[5..];
+
+            var codec = new CdrMessageCodec("std_msgs/msg/String", "string data");
+            CdrMessageCodecTests.StringMessage decoded = codec.Deserialize<CdrMessageCodecTests.StringMessage>(data);
+            Assert.Equal("from client", decoded.data);
+
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+        }
+
         private static async Task SendText(WebSocket socket, string text)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(text);
@@ -74,6 +125,13 @@ namespace FoxgloveRosSharp.Tests
         }
 
         private static async Task<string> ReceiveText(WebSocket socket)
+        {
+            WebSocketMessage message = await Receive(socket);
+            Assert.Equal(WebSocketMessageType.Text, message.Type);
+            return Encoding.UTF8.GetString(message.Payload);
+        }
+
+        private static async Task<WebSocketMessage> Receive(WebSocket socket)
         {
             byte[] buffer = new byte[4096];
             using var stream = new MemoryStream();
@@ -85,7 +143,7 @@ namespace FoxgloveRosSharp.Tests
             }
             while (!result.EndOfMessage);
 
-            return Encoding.UTF8.GetString(stream.ToArray());
+            return new WebSocketMessage(result.MessageType, stream.ToArray());
         }
 
         private static int GetFreePort()
@@ -93,6 +151,18 @@ namespace FoxgloveRosSharp.Tests
             using var tcp = new TcpListener(IPAddress.Loopback, 0);
             tcp.Start();
             return ((IPEndPoint)tcp.LocalEndpoint).Port;
+        }
+
+        private readonly struct WebSocketMessage
+        {
+            public WebSocketMessage(WebSocketMessageType type, byte[] payload)
+            {
+                Type = type;
+                Payload = payload;
+            }
+
+            public WebSocketMessageType Type { get; }
+            public byte[] Payload { get; }
         }
     }
 }

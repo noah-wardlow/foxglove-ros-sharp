@@ -229,9 +229,10 @@ Existing ROS# generated message classes can be reused when they expose
 `public const string RosMessageName`.
 
 Topic and service responses are decoded from Foxglove CDR payloads using the
-schemas advertised by the bridge. Publishing uses Foxglove client channels: it
-sends CDR when a matching schema has been advertised, otherwise it sends a
-JSON-encoded message payload.
+schemas advertised by the bridge. Publishing uses Foxglove client channels with
+CDR payloads. When the bridge has not already advertised a matching schema, the
+client generates a ROS message schema from the message class and includes it in
+the client channel advertisement.
 
 The CDR codec handles ROS 2 encapsulation-header-relative alignment, including
 8-byte aligned fields such as `float64[]` in `sensor_msgs/msg/JointState`.
@@ -246,6 +247,7 @@ The client has been live-tested against a Foxglove bridge with
 `include_hidden:=true` for:
 
 - subscribing to `/joint_states` as `sensor_msgs/msg/JointState`
+- publishing `std_msgs/msg/String` to ROS through `foxglove_bridge`
 - sending `/do_objective` as a ROS 2 action
 - receiving a successful action result
 

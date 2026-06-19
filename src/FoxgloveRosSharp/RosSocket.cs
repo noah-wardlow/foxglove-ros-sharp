@@ -67,7 +67,7 @@ namespace RosSharp.RosBridgeClient
                 if (publishers.ContainsKey(id))
                     Unadvertise(id);
 
-                publishers[id] = new PublisherState(topic, RosTypeName.FromMessageType<T>());
+                publishers[id] = new PublisherState(topic, RosTypeName.FromMessageType<T>(), typeof(T));
             }
             return id;
         }
@@ -824,12 +824,14 @@ namespace RosSharp.RosBridgeClient
                     ch => RosTypeName.NormalizeMessage(ch.SchemaName) == publisher.SchemaName);
             }
 
-            publisher.Encoding = matchingChannel != null ? "cdr" : "json";
-            publisher.Schema = matchingChannel?.Schema;
+            publisher.Encoding = "cdr";
+            publisher.Schema = matchingChannel?.Schema ?? RosMessageSchemaBuilder.Build(publisher.MessageType);
             int channelId = protocolClient.AdvertiseClientChannel(
                 publisher.Topic,
                 publisher.Encoding,
-                publisher.SchemaName);
+                publisher.SchemaName,
+                publisher.Schema,
+                "ros2msg");
             publisher.ClientChannelId = channelId;
         }
 
@@ -946,14 +948,16 @@ namespace RosSharp.RosBridgeClient
 
         private sealed class PublisherState
         {
-            public PublisherState(string topic, string schemaName)
+            public PublisherState(string topic, string schemaName, Type messageType)
             {
                 Topic = topic;
                 SchemaName = RosTypeName.NormalizeMessage(schemaName);
+                MessageType = messageType;
             }
 
             public string Topic { get; }
             public string SchemaName { get; }
+            public Type MessageType { get; }
             public string Encoding { get; set; } = "json";
             public string? Schema { get; set; }
             public int? ClientChannelId { get; set; }
