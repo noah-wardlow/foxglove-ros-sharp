@@ -27,6 +27,99 @@ namespace RosSharp.RosBridgeClient.Internal
             return field?.FieldType;
         }
 
+        public static object? GetNestedMemberValue(object target, string name)
+        {
+            foreach (PropertyInfo property in target.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(property.PropertyType))
+                    continue;
+
+                object? nested = property.GetValue(target);
+                if (nested != null && GetMemberType(nested.GetType(), name) != null)
+                    return GetMemberValue(nested, name);
+            }
+
+            foreach (FieldInfo field in target.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(field.FieldType))
+                    continue;
+
+                object? nested = field.GetValue(target);
+                if (nested != null && GetMemberType(nested.GetType(), name) != null)
+                    return GetMemberValue(nested, name);
+            }
+
+            return null;
+        }
+
+        public static Type? GetNestedMemberType(Type targetType, string name)
+        {
+            foreach (PropertyInfo property in targetType.GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(property.PropertyType))
+                    continue;
+
+                Type? nestedMemberType = GetMemberType(property.PropertyType, name);
+                if (nestedMemberType != null)
+                    return nestedMemberType;
+            }
+
+            foreach (FieldInfo field in targetType.GetFields(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(field.FieldType))
+                    continue;
+
+                Type? nestedMemberType = GetMemberType(field.FieldType, name);
+                if (nestedMemberType != null)
+                    return nestedMemberType;
+            }
+
+            return null;
+        }
+
+        public static bool SetNestedMemberValue(object target, string name, object? value)
+        {
+            foreach (PropertyInfo property in target.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(property.PropertyType) || GetMemberType(property.PropertyType, name) == null)
+                    continue;
+
+                object? nested = property.GetValue(target);
+                if (nested == null)
+                {
+                    nested = Activator.CreateInstance(property.PropertyType);
+                    property.SetValue(target, nested);
+                }
+
+                if (nested != null)
+                {
+                    SetMemberValue(nested, name, value);
+                    return true;
+                }
+            }
+
+            foreach (FieldInfo field in target.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!typeof(Message).IsAssignableFrom(field.FieldType) || GetMemberType(field.FieldType, name) == null)
+                    continue;
+
+                object? nested = field.GetValue(target);
+                if (nested == null)
+                {
+                    nested = Activator.CreateInstance(field.FieldType);
+                    field.SetValue(target, nested);
+                }
+
+                if (nested != null)
+                {
+                    SetMemberValue(nested, name, value);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static void SetMemberValue(object target, string name, object? value)
         {
             Type type = target.GetType();

@@ -1,85 +1,103 @@
 using RosSharp.RosBridgeClient;
 using RosSharp.RosBridgeClient.Internal;
+using RosSharp.RosBridgeClient.MessageTypes.UniqueIdentifier;
 using Xunit;
 
 namespace FoxgloveRosSharp.Tests
 {
-    public sealed class CdrMessageCodecTests
+    public sealed class CdrFlattenedActionCodecTests
     {
         [Fact]
-        public void RoundTripsGeneratedStringMessageShape()
+        public void SerializeObjectUsesNestedMessageFieldsForFlattenedActionGoalSchemas()
         {
-            var codec = new CdrMessageCodec("std_msgs/msg/String", "string data");
+            var request = new SendGoalRequest
+            {
+                goal_id = new UUID { uuid = new byte[16] },
+                goal = new ExampleGoal
+                {
+                    task_name = "sample",
+                    parameters = "speed=1.0"
+                }
+            };
 
-            byte[] bytes = codec.Serialize(new StringMessage { data = "hello" });
-            StringMessage decoded = codec.Deserialize<StringMessage>(bytes);
+            var codec = new CdrMessageCodec("example_msgs/action/ExampleTask_SendGoal_Request", FlattenedSendGoalSchema);
+            byte[] data = codec.SerializeObject(request);
 
-            Assert.Equal("hello", decoded.data);
+            FlatSendGoalRequest roundTrip = codec.Deserialize<FlatSendGoalRequest>(data);
+
+            Assert.Equal("sample", roundTrip.task_name);
+            Assert.Equal("speed=1.0", roundTrip.parameters);
         }
 
         [Fact]
-        public void RoundTripsNestedMessageAndVariableArray()
+        public void DeserializeObjectSetsNestedMessageFieldsForFlattenedActionResultSchemas()
         {
-            const string schema = """
-std_msgs/msg/Header header
-string[] name
-float64[] position
-================================================================================
-MSG: std_msgs/msg/Header
-builtin_interfaces/msg/Time stamp
-string frame_id
-================================================================================
-MSG: builtin_interfaces/msg/Time
-int32 sec
-uint32 nanosec
-""";
-            var codec = new CdrMessageCodec("sensor_msgs/msg/JointState", schema);
-
-            var source = new JointState
+            var codec = new CdrMessageCodec("example_msgs/action/ExampleTask_GetResult_Response", FlattenedGetResultSchema);
+            byte[] data = codec.Serialize(new FlatGetResultResponse
             {
-                header = new Header
-                {
-                    stamp = new Time { sec = 12, nanosec = 34 },
-                    frame_id = "base"
-                },
-                name = new[] { "joint_1", "joint_2" },
-                position = new[] { 1.5, 2.5 }
-            };
+                status = 4,
+                outcome = "done",
+                details = "ok"
+            });
 
-            JointState decoded = codec.Deserialize<JointState>(codec.Serialize(source));
+            GetResultResponse roundTrip = (GetResultResponse)codec.DeserializeObject(data, typeof(GetResultResponse));
 
-            Assert.Equal("base", decoded.header.frame_id);
-            Assert.Equal(12, decoded.header.stamp.sec);
-            Assert.Equal(new[] { "joint_1", "joint_2" }, decoded.name);
-            Assert.Equal(new[] { 1.5, 2.5 }, decoded.position);
+            Assert.Equal(4, roundTrip.status);
+            Assert.Equal("done", roundTrip.result.outcome);
+            Assert.Equal("ok", roundTrip.result.details);
         }
 
-        public sealed class StringMessage : Message
+        private const string FlattenedSendGoalSchema = """
+unique_identifier_msgs/msg/UUID goal_id
+string task_name
+string parameters
+================================================================================
+MSG: unique_identifier_msgs/msg/UUID
+uint8[16] uuid
+""";
+
+        private const string FlattenedGetResultSchema = """
+int8 status
+string outcome
+string details
+""";
+
+        private sealed class SendGoalRequest : Message
         {
-            public const string RosMessageName = "std_msgs/msg/String";
-            public string data { get; set; } = "";
+            public UUID goal_id { get; set; } = new();
+            public ExampleGoal goal { get; set; } = new();
         }
 
-        public sealed class JointState : Message
+        private sealed class FlatSendGoalRequest : Message
         {
-            public const string RosMessageName = "sensor_msgs/msg/JointState";
-            public Header header { get; set; } = new();
-            public string[] name { get; set; } = System.Array.Empty<string>();
-            public double[] position { get; set; } = System.Array.Empty<double>();
+            public UUID goal_id { get; set; } = new();
+            public string task_name { get; set; } = "";
+            public string parameters { get; set; } = "";
         }
 
-        public sealed class Header : Message
+        private sealed class ExampleGoal : Message
         {
-            public const string RosMessageName = "std_msgs/msg/Header";
-            public Time stamp { get; set; } = new();
-            public string frame_id { get; set; } = "";
+            public string task_name { get; set; } = "";
+            public string parameters { get; set; } = "";
         }
 
-        public sealed class Time : Message
+        private sealed class FlatGetResultResponse : Message
         {
-            public const string RosMessageName = "builtin_interfaces/msg/Time";
-            public int sec { get; set; }
-            public uint nanosec { get; set; }
+            public sbyte status { get; set; }
+            public string outcome { get; set; } = "";
+            public string details { get; set; } = "";
+        }
+
+        private sealed class GetResultResponse : Message
+        {
+            public sbyte status { get; set; }
+            public ExampleResult result { get; set; } = new();
+        }
+
+        private sealed class ExampleResult : Message
+        {
+            public string outcome { get; set; } = "";
+            public string details { get; set; } = "";
         }
     }
 }

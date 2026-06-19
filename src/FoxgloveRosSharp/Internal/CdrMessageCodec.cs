@@ -53,6 +53,9 @@ namespace RosSharp.RosBridgeClient.Internal
             foreach (RosField field in definition.Fields)
             {
                 object? value = ReflectionAccess.GetMemberValue(message, field.Name);
+                if (value == null && ReflectionAccess.GetMemberType(message.GetType(), field.Name) == null)
+                    value = ReflectionAccess.GetNestedMemberValue(message, field.Name);
+
                 if (field.IsArray)
                     WriteArray(writer, field, value);
                 else
@@ -105,20 +108,29 @@ namespace RosSharp.RosBridgeClient.Internal
             if (!definitions.TryGetValue(type, out RosMessageDefinition? definition))
                 throw new InvalidOperationException($"No ROS message definition for {type}.");
 
+            Type targetType = target.GetType();
             foreach (RosField field in definition.Fields)
             {
+                Type? memberType = ReflectionAccess.GetMemberType(targetType, field.Name);
+                Type? nestedMemberType = memberType == null
+                    ? ReflectionAccess.GetNestedMemberType(targetType, field.Name)
+                    : null;
+
                 object? value = field.IsArray
-                    ? ReadArray(reader, field, target.GetType())
-                    : ReadValue(reader, field.Type, ReflectionAccess.GetMemberType(target.GetType(), field.Name) ?? typeof(object));
-                ReflectionAccess.SetMemberValue(target, field.Name, value);
+                    ? ReadArray(reader, field, memberType ?? nestedMemberType ?? typeof(object[]))
+                    : ReadValue(reader, field.Type, memberType ?? nestedMemberType ?? typeof(object));
+
+                if (memberType != null)
+                    ReflectionAccess.SetMemberValue(target, field.Name, value);
+                else
+                    ReflectionAccess.SetNestedMemberValue(target, field.Name, value);
             }
         }
 
-        private object ReadArray(CdrReader reader, RosField field, Type targetType)
+        private object ReadArray(CdrReader reader, RosField field, Type memberType)
         {
             int length = field.FixedLength ?? checked((int)reader.ReadUInt32());
             object?[] values = new object?[length];
-            Type memberType = ReflectionAccess.GetMemberType(targetType, field.Name) ?? typeof(object[]);
             Type elementType = memberType.IsArray ? memberType.GetElementType() ?? typeof(object) : typeof(object);
 
             for (int i = 0; i < length; i++)
